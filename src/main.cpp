@@ -23,8 +23,7 @@ TFT_eSPI tft = TFT_eSPI();
 #define XPT2046_CLK 25  // T_CLK
 #define XPT2046_CS 33   // T_CS
 
-// Create a instance of the SPIClass and XPT2046_Touchscreen classes
-SPIClass touchscreenSPI = SPIClass(VSPI);
+// Create a instance of the XPT2046_Touchscreen classes
 XPT2046_Touchscreen touchscreen(XPT2046_CS, XPT2046_IRQ);
 
 // Define the size of the TFT display
@@ -208,8 +207,8 @@ void setup() {
   lv_init();
 
   // Start the SPI for the touchscreen and init the touchscreen
-  touchscreenSPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
-  touchscreen.begin(touchscreenSPI);
+  SPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
+  touchscreen.begin();
   // Set the Touchscreen rotation in landscape mode
   // Note: in some displays, the touchscreen might be upside down, so you might need to set the rotation to 0: touchscreen.setRotation(0);
   touchscreen.setRotation(2);
