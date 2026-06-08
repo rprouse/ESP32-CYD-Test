@@ -188,6 +188,19 @@ bool touch_read(int32_t *x, int32_t *y) {
     if (!cal_loaded) return false;
     uint16_t rx, ry;
     if (!read_raw(&rx, &ry)) return false;
-    map_raw_to_screen(rx, ry, x, y);
+
+    // Calibrated coordinates in the displayed (landscape) frame.
+    int32_t sx, sy;
+    map_raw_to_screen(rx, ry, &sx, &sy);
+
+    // LVGL applies its own rotation to every input point (lv_display_rotate_point).
+    // main.cpp sets LV_DISPLAY_ROTATION_270, whose transform is
+    //   logical.x = in.y;  logical.y = TFT_WIDTH - in.x - 1
+    // so LVGL expects the point in the display's NATIVE (unrotated, portrait)
+    // frame and rotates it to the landscape widgets itself. Convert our
+    // landscape coords to that native frame (the inverse of the 270 transform).
+    // If main.cpp's display rotation changes, update this transform to match.
+    *x = (TFT_WIDTH - 1) - sy;
+    *y = sx;
     return true;
 }
