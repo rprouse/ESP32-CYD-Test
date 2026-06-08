@@ -459,17 +459,31 @@ Expected: calibration screen on first boot; after tapping the three targets, tou
 Run: `pio run -e ESP32_2432S028R_ST7789 -t erase && pio run -e ESP32_2432S028R_ST7789 -t upload && pio device monitor -b 115200`
 Expected: same as Step 2 — first-boot calibration, accurate touch afterward, silent load on reboot.
 
-- [ ] **Step 4: Fix orientation only if a board showed rotation/mirror in Task 2 Step 6 or Steps 2-3**
+- [ ] **Step 4: Map touch into LVGL's native frame (RESOLVED during execution)**
 
-The 3-corner calibration already corrects raw axis swap and inversion, so a remaining mismatch is purely between the map's output box and LVGL's expected input box. The single lever is the rotation pairing between the touch map and the LVGL display. If a board is rotated/mirrored:
+The 3-corner calibration corrects raw axis swap and inversion, so the only
+remaining mismatch was between the map's output frame and LVGL's expected input
+frame. Root cause (confirmed in LVGL source, `lv_indev.c:743` →
+`lv_display_rotate_point`): LVGL applies its own rotation to every input point
+and expects coordinates in the display's **native (unrotated) frame**, then
+rotates them to the landscape widgets itself. Our map produced
+displayed-landscape coordinates, so LVGL rotated them a second time and taps
+landed on the wrong widgets.
 
-For that board, try the alternate display rotation in `src/main.cpp` `setup()` — change:
+Fix (applied in `src/touch.cpp` `touch_read()`): after `map_raw_to_screen()`
+produces landscape coords `(sx, sy)`, convert to the native frame — the inverse
+of LVGL's `ROTATION_270` transform:
 
 ```cpp
-  lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
+    *x = (TFT_WIDTH - 1) - sy;
+    *y = sx;
 ```
 
-to `LV_DISPLAY_ROTATION_90`, and correspondingly change `tft.setRotation(3);` to `tft.setRotation(1);` in `touch_init()` (`src/touch.cpp`). Re-erase, reflash, recalibrate, and re-verify. Keep the pairing consistent (270↔rotation 3, or 90↔rotation 1) so the calibration draw orientation matches the GUI.
+This is why the old per-board code worked (it fed native-portrait coords via
+`map(p.x, …, TFT_WIDTH)`). The same transform is correct for all three boards
+because each is created portrait + `LV_DISPLAY_ROTATION_270`. If `main.cpp`'s
+display rotation ever changes, update this transform to match the new
+`lv_display_rotate_point` mapping. Verified accurate on the Freenove.
 
 - [ ] **Step 5: Commit any fix**
 

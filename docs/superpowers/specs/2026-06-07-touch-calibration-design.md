@@ -138,6 +138,25 @@ struct TouchCal { uint16_t xTL, yTL, xTR, yTR, xBL, yBL; };
 Because the stored value is the raw anchor points (not derived slopes), the blob
 stays valid across future changes to the mapping math.
 
+## LVGL native-frame input transform
+
+LVGL rotates every input point itself (`lv_indev.c` → `lv_display_rotate_point`)
+and expects coordinates in the display's **native (unrotated) frame**, then maps
+them onto the rotated landscape widgets. `main.cpp` uses
+`LV_DISPLAY_ROTATION_270`. So after `map_raw_to_screen()` yields displayed
+landscape coords `(sx, sy)`, `touch_read()` converts them to the native frame —
+the inverse of the `ROTATION_270` mapping:
+
+```cpp
+*x = (TFT_WIDTH - 1) - sy;   // native portrait x
+*y = sx;                      // native portrait y
+```
+
+Without this, LVGL rotates our already-landscape point a second time and taps
+land on the wrong widget. This matches how the original per-board code fed
+native-portrait coordinates via `map(p.x, …, TFT_WIDTH)`. If the display
+rotation in `main.cpp` changes, this transform must be updated to match.
+
 ## `touch_init()` decision flow
 
 The shared `tft` instance is initialized on **every** board (not just the
