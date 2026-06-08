@@ -140,12 +140,21 @@ stays valid across future changes to the mapping math.
 
 ## `touch_init()` decision flow
 
+The shared `tft` instance is initialized on **every** board (not just the
+Freenove) because the calibration screen draws through it. On the XPT2046 boards
+that means we now bring up our `tft` instance for drawing *in addition* to the
+dedicated touch SPI bus + `ts` object; LVGL still uses its own instance for the
+GUI. `tft` is set to the landscape rotation (3) that matches the GUI's
+`LV_DISPLAY_ROTATION_270`, and `touch_init()` runs before `lv_tft_espi_create()`
+so the calibration screen renders on a known orientation.
+
 ```
-init controller (per board: SPI.begin + ts.begin / tft already up)
+tft.init(); tft.setRotation(3)                 // ALL boards (draw cal screen, defines map W/H)
+#if XPT2046: SPI.begin(touch bus); ts.begin(); ts.setRotation(0)
 if held_at_boot():                 // forces re-cal on demand
     run_calibration(); return
 if load_cal() && spans_valid():
-    return                         // normal path
+    cal_loaded = true; return      // normal path
 run_calibration()                  // first boot / invalid / version bump
 ```
 
