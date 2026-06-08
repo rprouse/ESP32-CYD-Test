@@ -10,21 +10,28 @@
 #include <TFT_eSPI.h>
 
 // include the installed the "XPT2046_Touchscreen" library by Paul Stoffregen to use the Touchscreen - https://github.com/PaulStoffregen/XPT2046_Touchscreen
+// Only needed on boards whose touch controller is on a dedicated SPI bus.
+#if defined(TOUCH_XPT2046_LIB)
 #include <XPT2046_Touchscreen.h>
+#endif
 
 
-// Create a instance of the TFT_eSPI class
+// Create a instance of the TFT_eSPI class.
+// On boards where touch shares the display SPI bus (TOUCH_TFT_ESPI) this same
+// instance also reads the touch controller via tft.getTouch().
 TFT_eSPI tft = TFT_eSPI();
 
-// Set the pius of the xpt2046 touchscreen
-#define XPT2046_IRQ 36  // T_IRQ
-#define XPT2046_MOSI 32 // T_DIN
-#define XPT2046_MISO 39 // T_OUT
-#define XPT2046_CLK 25  // T_CLK
-#define XPT2046_CS 33   // T_CS
-
-// Create a instance of the XPT2046_Touchscreen classes
+// Touch pins / driver are selected per board in the Setup_*.h header.
+#if defined(TOUCH_XPT2046_LIB)
+// Touch on its own dedicated SPI bus -> standalone XPT2046_Touchscreen library.
 XPT2046_Touchscreen touchscreen(XPT2046_CS, XPT2046_IRQ);
+#elif defined(TOUCH_TFT_ESPI)
+// Touch shares the display SPI bus -> calibration data for tft.getTouch().
+// TODO: replace with values printed by TFT_eSPI's "Touch_calibrate" example.
+static uint16_t touch_calibration[5] = { 300, 3600, 300, 3600, 7 };
+#else
+#error "No touch driver selected - define TOUCH_XPT2046_LIB or TOUCH_TFT_ESPI in your Setup_*.h"
+#endif
 
 // Define the size of the buffer for the TFT display
 #define DRAW_BUF_SIZE (TFT_WIDTH * TFT_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
@@ -44,21 +51,56 @@ bool rightLedOn = true;
 // Create a buffer for drawing
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
+// Initialise the touch controller. The body is selected per board; the rest of
+// this sketch is identical across all targets.
+static void touch_init() {
+#if defined(TOUCH_XPT2046_LIB)
+  // Touch on its own dedicated SPI bus.
+  SPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
+  touchscreen.begin();
+  touchscreen.setRotation(2);
+#elif defined(TOUCH_TFT_ESPI)
+  // Touch shares the display SPI bus; bring up our TFT_eSPI instance (LVGL uses
+  // its own) and apply the calibration that tft.getTouch() maps with.
+  // Done before lv_tft_espi_create() so LVGL's begin() ends up owning the display.
+  tft.init();
+  tft.setRotation(3);                 // match the landscape display orientation
+  tft.setTouch(touch_calibration);
+#endif
+}
+
+// Read the touch controller and return mapped screen coordinates.
+// Returns true if the screen is currently pressed. Per-board body only.
+static bool touch_get(int32_t *tx, int32_t *ty) {
+#if defined(TOUCH_XPT2046_LIB)
+  if (touchscreen.tirqTouched() && touchscreen.touched()) {
+    TS_Point p = touchscreen.getPoint();
+    // Calibrate raw points with map() to the correct width and height
+    *tx = map(p.x, 200, 3700, 1, TFT_WIDTH);
+    *ty = map(p.y, 240, 3800, 1, TFT_HEIGHT);
+    return true;
+  }
+  return false;
+#elif defined(TOUCH_TFT_ESPI)
+  uint16_t rawx, rawy;
+  if (tft.getTouch(&rawx, &rawy)) {   // shares the display SPI bus, uses TOUCH_CS
+    *tx = rawx;
+    *ty = rawy;
+    return true;
+  }
+  return false;
+#endif
+}
+
 // Get the Touchscreen data
 void touchscreen_read(lv_indev_t * indev, lv_indev_data_t * data) {
-  // Checks if Touchscreen was touched, and prints X, Y and Pressure (Z)
-  if(touchscreen.tirqTouched() && touchscreen.touched()) {
-    // Get Touchscreen points
-    TS_Point p = touchscreen.getPoint();
-    // Calibrate Touchscreen points with map function to the correct width and height
-    x = map(p.x, 200, 3700, 1, TFT_WIDTH);
-    y = map(p.y, 240, 3800, 1, TFT_HEIGHT);
-    z = p.z;
+  // Checks if Touchscreen was touched, and prints X, Y
+  int32_t tx, ty;
+  if (touch_get(&tx, &ty)) {
+    x = tx;
+    y = ty;
 
-    String touch_coord = String("touch: (") + x + "," + y + ")";
-
-    Serial.begin(115200);
-    Serial.println(touch_coord);
+    Serial.printf("touch: (%d,%d)\n", (int)x, (int)y);
 
     data->state = LV_INDEV_STATE_PRESSED;
 
@@ -205,12 +247,10 @@ void setup() {
   // Start LVGL
   lv_init();
 
-  // Start the SPI for the touchscreen and init the touchscreen
-  SPI.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
-  touchscreen.begin();
-  // Set the Touchscreen rotation in landscape mode
-  // Note: in some displays, the touchscreen might be upside down, so you might need to set the rotation to 0: touchscreen.setRotation(0);
-  touchscreen.setRotation(2);
+  // Initialise the touch controller (implementation is per board).
+  // For boards that share the display SPI bus this also brings up the TFT
+  // instance, so it must run before lv_tft_espi_create() below.
+  touch_init();
 
   // Create a display object
   lv_display_t *disp;

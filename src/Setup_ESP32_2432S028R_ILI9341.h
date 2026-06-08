@@ -183,6 +183,16 @@
 
 #define TOUCH_CS 33     // Chip select pin (T_CS) of touch screen
 
+// Touch driver selection (used by main.cpp).
+// This board has the XPT2046 on its own dedicated SPI bus, so use the
+// standalone XPT2046_Touchscreen library on the pins below.
+#define TOUCH_XPT2046_LIB
+#define XPT2046_IRQ  36 // T_IRQ
+#define XPT2046_MOSI 32 // T_DIN
+#define XPT2046_MISO 39 // T_OUT
+#define XPT2046_CLK  25 // T_CLK
+#define XPT2046_CS   33 // T_CS
+
 //#define TFT_WR PIN_D2       // Write strobe for modified Raspberry Pi TFT only
 
 

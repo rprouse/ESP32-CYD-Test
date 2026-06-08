@@ -221,6 +221,12 @@
 
 #define TOUCH_CS 33     // Chip select pin (T_CS) of touch screen
 
+// Touch driver selection (used by main.cpp).
+// On this board the XPT2046 shares the display's SPI bus (SCLK/MOSI/MISO =
+// GPIO 14/13/12) with a separate CS, so we use TFT_eSPI's built-in touch
+// (tft.getTouch) over the TOUCH_CS pin above rather than a second SPI bus.
+#define TOUCH_TFT_ESPI
+
 //#define TFT_WR 22    // Write strobe for modified Raspberry Pi TFT only
 
 // For the M5Stack module use these #define lines
