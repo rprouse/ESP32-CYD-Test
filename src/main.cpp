@@ -26,12 +26,8 @@ TFT_eSPI tft = TFT_eSPI();
 // Create a instance of the XPT2046_Touchscreen classes
 XPT2046_Touchscreen touchscreen(XPT2046_CS, XPT2046_IRQ);
 
-// Define the size of the TFT display
-#define SCREEN_WIDTH 240
-#define SCREEN_HEIGHT 320
-
 // Define the size of the buffer for the TFT display
-#define DRAW_BUF_SIZE (SCREEN_WIDTH * SCREEN_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
+#define DRAW_BUF_SIZE (TFT_WIDTH * TFT_HEIGHT / 10 * (LV_COLOR_DEPTH / 8))
 
 // Touchscreen coordinates: (x, y) and pressure (z)
 int x, y, z;
@@ -48,7 +44,6 @@ bool rightLedOn = true;
 // Create a buffer for drawing
 uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
-
 // Get the Touchscreen data
 void touchscreen_read(lv_indev_t * indev, lv_indev_data_t * data) {
   // Checks if Touchscreen was touched, and prints X, Y and Pressure (Z)
@@ -56,9 +51,14 @@ void touchscreen_read(lv_indev_t * indev, lv_indev_data_t * data) {
     // Get Touchscreen points
     TS_Point p = touchscreen.getPoint();
     // Calibrate Touchscreen points with map function to the correct width and height
-    x = map(p.x, 200, 3700, 1, SCREEN_WIDTH);
-    y = map(p.y, 240, 3800, 1, SCREEN_HEIGHT);
+    x = map(p.x, 200, 3700, 1, TFT_WIDTH);
+    y = map(p.y, 240, 3800, 1, TFT_HEIGHT);
     z = p.z;
+
+    String touch_coord = String("touch: (") + x + "," + y + ")";
+
+    Serial.begin(115200);
+    Serial.println(touch_coord);
 
     data->state = LV_INDEV_STATE_PRESSED;
 
@@ -128,7 +128,6 @@ static void event_handler(lv_event_t *e)
     }
 }
 
-
 static lv_obj_t * slider_label;
 // Callback that prints the current slider value on the TFT display and Serial Monitor for debugging purposes
 static void slider_event_callback(lv_event_t * e) {
@@ -138,7 +137,6 @@ static void slider_event_callback(lv_event_t * e) {
   lv_label_set_text(slider_label, buf);
   lv_obj_align_to(slider_label, slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
 }
-
 
 void lv_create_main_gui(void) {
 
@@ -164,7 +162,6 @@ void lv_create_main_gui(void) {
   lv_obj_set_width(text_label, 150);    // Set smaller width to make the lines wrap
   lv_obj_set_style_text_align(text_label, LV_TEXT_ALIGN_CENTER, 0);
   lv_obj_align(text_label, LV_ALIGN_CENTER, 0, -90);
-
 
   lv_obj_t * sw;
 
@@ -199,7 +196,9 @@ void lv_create_main_gui(void) {
 }
 
 void setup() {
+
   String LVGL_Arduino = String("LVGL Library Version: ") + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
+
   Serial.begin(115200);
   Serial.println(LVGL_Arduino);
 
@@ -217,7 +216,7 @@ void setup() {
   lv_display_t *disp;
 
   // Initialize the TFT display using the TFT_eSPI library
-  disp = lv_tft_espi_create(SCREEN_WIDTH, SCREEN_HEIGHT, draw_buf, sizeof(draw_buf));
+  disp = lv_tft_espi_create(TFT_WIDTH, TFT_HEIGHT, draw_buf, sizeof(draw_buf));
   lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
 
   // Initialize an LVGL input device object (Touchscreen)
